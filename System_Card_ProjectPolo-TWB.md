@@ -1,7 +1,7 @@
 # Overview
 
 ## Description:
-Project Polo is used to evaluate advanced Retrieval-Augmented Generation (RAG) based chatbot specifically designed to handle Trustworthy AI-related queries and questions in low-resource settings with limited Internet access. The purpose of the assessment is to determine whether Project Polo would be useful as a potential solution to equip health professionals in low-income countries with rapid, context-aware access to trustworthy medical knowledge at the point of care, improving clinical decision-making, diagnostic accuracy, and patient outcomes. 
+Techies without Borders' Continuing Medical Education Solution (CMES) is used to evaluate advanced Retrieval-Augmented Generation (RAG) based chatbot specifically designed to handle Trustworthy AI-related queries and questions in low-resource settings with limited Internet access. The purpose of the assessment is to determine whether Project Polo would be useful as a potential solution to equip health professionals in low-income countries with rapid, context-aware access to trustworthy medical knowledge at the point of care, improving clinical decision-making, diagnostic accuracy, and patient outcomes. 
 
 The following functionalities are evaluated:
 
@@ -39,7 +39,7 @@ The users of Project Polo are participants in the CMES initiative from Techies W
 
 
 ## Known Risks:
-In rare instances, this system may provide misinformation.  If in doubt, please reach out to the product owner Michael Boone (mboone@nvidia.com).
+In rare instances, this system may provide misinformation.  If in doubt, please reach out to the product owner.
 
 ## Fail Safe In-Place:
 Emergency Override
@@ -55,7 +55,7 @@ The system architecture of Project Polo consists of a FastAPI backend (Port 70) 
 
 ![Project Polo System Architecture](polo-simplified-arch-twb.png)
 
-The following NIMs are used by this blueprint:
+The following NIMs are used:
 1. Document Processing: nvidia/llama-3.1-nemotron-51b-instruct
 2. Embeddings: nvidia/nv-embedqa-e5-v5
 3. Reranking: nvidia/nv-rerankqa-mistral-4b-v3
@@ -99,7 +99,7 @@ The following NIMs are used by this blueprint:
 * Windows <br>
 
 ## System Version(s)
-nv-project-polo-v1.1.0 
+v1.1.0 
 
 ## Inference:
 **Engine:** N/A <br>
@@ -110,4 +110,3 @@ nv-project-polo-v1.1.0
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications. When downloaded or used in accordance with our terms of service, developers should work with their internal model team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.
 
 Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).
-
