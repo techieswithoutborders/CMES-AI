@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline Medical Q&amp;A — test console</title>
+<style>
+/* ===== Apple-inspired glass theme ===== */
+:root{
+  --bg:#f5f5f7;
+  --glass-bg:rgba(255,255,255,0.82);
+  --glass-border:rgba(255,255,255,0.55);
+  --glass-shadow:0 8px 32px rgba(0,0,0,0.06);
+  --brand:#0a84ff;
+  --brand-glass:rgba(10,132,255,0.18);
+  --ink:#1d1d1f;
+  --mute:#8e8e93;
+  --line:rgba(0,0,0,0.12);
+  --ok:#30d158;
+  --warn:#ff9f0a;
+  --bad:#ff453a;
+  --hl:#fff9c4;
+  --t1:#30d158;--t2:#0a84ff;--t3:#8e8e93;--t4:#bf5af2;
+  --card-bg:rgba(255,255,255,0.7);
+  --card-border:rgba(0,0,0,0.1);
+  --focus-ring:2px solid var(--brand);
+  --focus-offset:2px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000;
+    --glass-bg:rgba(28,28,30,0.82);
+    --glass-border:rgba(255,255,255,0.12);
+    --glass-shadow:0 8px 32px rgba(0,0,0,0.30);
+    --brand:#0a84ff;
+    --brand-glass:rgba(10,132,255,0.18);
+    --ink:#f5f5f7;
+    --mute:#8e8e93;
+    --line:rgba(255,255,255,0.15);
+    --ok:#30d158;
+    --warn:#ff9f0a;
+    --bad:#ff453a;
+    --hl:#4a3a00;
+    --t1:#30d158;--t2:#0a84ff;--t3:#8e8e93;--t4:#bf5af2;
+    --card-bg:rgba(28,28,30,0.7);
+    --card-border:rgba(255,255,255,0.1);
+    --focus-ring:2px solid var(--brand);
+    --focus-offset:2px;
+  }
+}
+[data-theme="light"]{
+  --bg:#f5f5f7;--glass-bg:rgba(255,255,255,0.82);--glass-border:rgba(255,255,255,0.55);
+  --glass-shadow:0 8px 32px rgba(0,0,0,0.06);--ink:#1d1d1f;--mute:#8e8e93;--line:rgba(0,0,0,0.12);
+  --card-bg:rgba(255,255,255,0.7);--card-border:rgba(0,0,0,0.1);--hl:#fff9c4;
+}
+[data-theme="dark"]{
+  --bg:#000000;--glass-bg:rgba(28,28,30,0.82);--glass-border:rgba(255,255,255,0.12);
+  --glass-shadow:0 8px 32px rgba(0,0,0,0.30);--ink:#f5f5f7;--mute:#8e8e93;--line:rgba(255,255,255,0.15);
+  --card-bg:rgba(28,28,30,0.7);--card-border:rgba(255,255,255,0.1);--hl:#4a3a00;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ---------- Header (sticky) ---------- */
+header{position:sticky;top:0;z-index:50;background:var(--glass-bg);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--glass-border);box-shadow:var(--glass-shadow);flex:0 0 auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;font-size:13px;color:var(--mute)}
+.bar b{color:var(--ink)}
+.disclaimer{background:rgba(255,214,0,0.12);color:#6b4300;padding:6px 14px;font-size:13px;font-weight:600;border-bottom:1px solid rgba(240,217,168,0.5)}
+@media (prefers-color-scheme:dark){.disclaimer{background:rgba(255,169,0,0.15);color:#ffd38a;border-color:rgba(91,68,22,0.5)}}
+[data-theme="dark"] .disclaimer{background:rgba(255,169,0,0.15);color:#ffd38a;border-color:rgba(91,68,22,0.5)}
+
+/* ---------- Split container ---------- */
+.split{flex:1 1 auto;display:flex;overflow:hidden;min-height:0;position:relative}
+
+/* ---------- Left pane ---------- */
+.left-pane{
+  flex:0 0 auto;width:var(--pane-width,280px);min-width:0;max-width:800px;
+  background:var(--glass-bg);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+  border-right:1px solid var(--glass-border);box-shadow:var(--glass-shadow);
+  display:flex;flex-direction:column;overflow:hidden;z-index:40
+}
+.pane-title{padding:12px 16px;font-weight:700;color:var(--ink);font-size:15px;letter-spacing:-0.2px;background:var(--glass-bg);border-bottom:1px solid var(--glass-border)}
+.nav-list{list-style:none;margin:0;padding:8px 4px;overflow-y:auto;flex:1}
+.nav-list li{padding:0}
+.nav-list button{
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;border:0;background:transparent;color:var(--mute);
+  font:inherit;font-weight:500;cursor:pointer;text-align:left;border-radius:8px;margin:4px 10px;position:relative
+}
+.nav-list button[aria-pressed="true"]{background:var(--brand-glass);color:var(--brand);font-weight:600}
+.nav-list button:focus-visible{outline:var(--focus-ring);outline-offset:var(--focus-offset)}
+.nav-icon{font-size:14px;width:16px;text-align:center}
+.collapse-toggle{
+  display:none;padding:8px;border:0;background:var(--glass-bg);color:var(--mute);cursor:pointer;border-top:1px solid var(--glass-border);font-size:16px
+}
+.collapse-toggle:focus-visible{outline:var(--focus-ring);outline-offset:var(--focus-offset)}
+@media (max-width:900px){.collapse-toggle{display:block}}
+@media (min-width:901px){.collapse-toggle{display:none}}
+
+/* ---------- Splitter ---------- */
+.splitter{
+  width:8px;cursor:ew-resize;z-index:45;flex:0 0 auto;background:transparent;position:relative;user-select:none
+}
+.splitter::before{
+  content:"";position:absolute;left:50%;top:0;bottom:0;width:8px;transform:translateX(-50%);
+  background:var(--line);border-radius:4px;pointer-events:none
+}
+.splitter:hover::before,.splitter:focus-visible::before{background:var(--brand);width:10px}
+.splitter:focus-visible{outline:var(--focus-ring);outline-offset:var(--focus-offset)}
+.splitter.dragging::before{background:var(--brand);width:10px}
+
+/* ---------- Right pane ---------- */
+.right-pane{flex:1 1 auto;min-width:0;overflow:auto;background:var(--bg);padding:14px}
+
+/* right-pane internal split: examples zone | answer zone */
+#ask-deck{display:flex;flex-direction:column;min-height:0;gap:10px}
+.ask-zone{min-height:0;overflow:auto;overscroll-behavior:contain}
+.ask-zone .card{margin:0}
+#examples{max-height:220px;overflow:auto}
+.answer-zone{min-height:0;flex:1 1 auto;overflow:auto;overscroll-behavior:contain;
+  border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.answer-zone::before{
+  content:"Search results";display:block;font-size:12px;color:var(--mute);
+  margin-bottom:6px;letter-spacing:.4px;text-transform:uppercase}
+
+/* ---------- Collapsed states ---------- */
+.split[data-collapsed="true"] .left-pane{width:0;min-width:0;visibility:hidden;border-right:none;box-shadow:none;pointer-events:none}
+.split[data-collapsed="true"] .splitter{display:none}
+
+/* ---------- Preserved component styles (glass-adapted) ---------- */
+section{display:none}section.on{display:block}
+.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:14px;margin:12px 0;backdrop-filter:blur(10px) saturate(160%);-webkit-backdrop-filter:blur(10px) saturate(160%)}
+h2{font-size:17px;margin:0 0 8px}h3{font-size:15px;margin:12px 0 6px}.muted{color:var(--mute)}.small{font-size:13px}
+input[type=text],textarea,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--glass-bg);color:var(--ink);font:inherit;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+textarea{min-height:64px;resize:vertical}
+button.pri,button.sec{padding:9px 16px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--brand)}
+button.pri{background:var(--brand);color:#fff}button.sec{background:var(--glass-bg);color:var(--brand)}button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}.row>*{flex:0 0 auto}.grow{flex:1 1 220px!important}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700;border:1px solid var(--line);margin:0 4px 4px 0;background:var(--glass-bg)}
+.ex{cursor:pointer;font-weight:500}.ex:hover{border-color:var(--brand)}
+.t1{color:var(--t1);border-color:var(--t1)}.t2{color:var(--t2);border-color:var(--t2)}.t3{color:var(--t3)}.t4{color:var(--t4);border-color:var(--t4)}
+.ok{color:var(--ok);border-color:var(--ok)}.warn{color:var(--warn);border-color:var(--warn)}.bad{color:var(--bad);border-color:var(--bad)}
+.banner{padding:10px 12px;border-radius:8px;margin:8px 0;border:1px solid}
+.banner.warn{background:rgba(255,159,10,0.12);border-color:rgba(255,159,10,0.4);color:#6b4300}
+.banner.bad{background:rgba(255,69,58,0.12);border-color:rgba(255,69,58,0.4);color:#8a1c22}
+.banner.ok{background:rgba(48,209,88,0.12);border-color:rgba(48,209,88,0.4);color:#0d5c33}
+@media (prefers-color-scheme:dark){
+  .banner.warn{background:rgba(255,159,10,0.15);border-color:rgba(255,159,10,0.3);color:#ffd38a}
+  .banner.bad{background:rgba(255,69,58,0.15);border-color:rgba(255,69,58,0.3);color:#ffb3b6}
+  .banner.ok{background:rgba(48,209,88,0.15);border-color:rgba(48,209,88,0.3);color:#9be3bd}
+}
+[data-theme="dark"] .banner.warn{background:rgba(255,159,10,0.15);border-color:rgba(255,159,10,0.3);color:#ffd38a}
+[data-theme="dark"] .banner.bad{background:rgba(255,69,58,0.15);border-color:rgba(255,69,58,0.3);color:#ffb3b6}
+[data-theme="dark"] .banner.ok{background:rgba(48,209,88,0.15);border-color:rgba(48,209,88,0.3);color:#9be3bd}
+.answer{font-size:16px;white-space:pre-wrap;border-left:4px solid var(--brand);padding:4px 12px;margin:8px 0}
+.tblwrap{overflow:auto;margin:8px 0}table.tbl{border-collapse:collapse;font-size:13px;min-width:100%}
+.tbl th,.tbl td{border:1px solid var(--line);padding:5px 8px;vertical-align:top;text-align:left}
+.tbl th{background:var(--glass-bg)}
+.tbl td.hl{background:var(--hl);font-weight:700;outline:2px solid var(--warn);outline-offset:-2px}
+pre{background:var(--glass-bg);border:1px solid var(--line);border-radius:8px;padding:8px;overflow:auto;font-size:12px;max-height:260px;white-space:pre-wrap}
+table.plain{border-collapse:collapse;width:100%;font-size:14px}.plain th,.plain td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:100;overflow:auto;padding:20px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.modal.on{display:block}
+.modal .in{background:var(--glass-bg);max-width:860px;margin:40px auto;border-radius:12px;padding:16px;backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow)}
+.pg{position:relative;display:inline-block;max-width:100%}
+.pg img{max-width:100%;display:block}
+.pg .box{position:absolute;border:2px solid var(--brand);background:rgba(10,132,255,.12)}
+.pg .cell{position:absolute;border:2px solid #e8a200;background:rgba(255,214,0,.35)}
+.sp{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:s 1s linear infinite;vertical-align:-2px}
+@keyframes s{to{transform:rotate(360deg)}}
+details>summary{cursor:pointer;color:var(--brand);font-size:13px}
+@media (prefers-reduced-motion:reduce){.sp{animation:none}}
+
+.logo-img{width:48px;height:48px;object-fit:contain;flex:0 0 auto}
+
+@media (max-width: 900px){
+  /* Mobile: narrower left pane */
+  .left-pane{width:var(--pane-width,260px);max-width:90vw}
+  .splitter{width:6px}
+  .right-pane{padding:10px}
+
+  /* Header: stack logo + title vertically on narrow screens */
+  .bar{gap:8px 10px;padding:10px 12px;font-size:13px}
+  .bar .logo-img{width:40px;height:40px}
+  .bar b{font-size:15px;line-height:1.2}
+}
+
+@media (max-width: 600px){
+  /* Mobile: hide nav pane by default, show collapse toggle */
+  .split{flex-direction:column}
+  .left-pane{
+    flex:0 0 auto;width:100%;height:auto;max-height:60vh;overflow:auto;
+    position:absolute;top:0;left:0;right:0;z-index:60;visibility:hidden;pointer-events:none;opacity:0;transition:opacity .2s
+  }
+  .split[data-nav-open="true"] .left-pane{visibility:visible;pointer-events:auto;opacity:1}
+  .split[data-collapsed="true"] .left-pane{width:0;min-width:0;visibility:hidden;border-right:none;box-shadow:none;pointer-events:none}
+  .split[data-collapsed="true"] .splitter{display:none}
+
+  .splitter{display:none}
+  .right-pane{padding:8px}
+
+  /* Stack the search form row vertically */
+  .row{flex-direction:column;align-items:stretch}
+  .row > *{flex:1 1 auto!important;width:100%!important}
+  .row .grow{width:100%!important}
+
+  /* Table wrap already scrolls; ensure fonts readable */
+  table.tbl{font-size:12px}
+  .tbl th,.tbl td{padding:4px 6px}
+
+  /* Modal tighter on phones */
+  .modal{padding:12px}
+  .modal .in{margin:20px auto;padding:14px}
+
+  /* Smaller chips/badges */
+  .chip{font-size:11px;padding:1px 7px}
+  .nav-list button{padding:10px 12px;font-size:14px}
+}
+
+@media (max-width: 480px){
+  header{position:sticky;top:0}
+  .disclaimer{font-size:12px;padding:6px 10px}
+  .answer{font-size:15px}
+  h2{font-size:16px}h3{font-size:14px}
+}
+
+.burger{display:none;border:0;background:transparent;color:var(--ink);font-size:20px;padding:8px 10px;cursor:pointer;border-radius:8px;margin-right:4px}
+.burger:focus-visible{outline:var(--focus-ring);outline-offset:var(--focus-offset)}
+.burger:hover{background:rgba(0,0,0,0.06)}
+@media (max-width: 600px){.burger{display:block}}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar" id="statusbar"><button class="burger" id="burger" aria-label="Menu">&#9776;</button><img class="logo-img" src="/ui/cmesworldlogo.gif" alt="CMES World logo"><b>Offline Medical Q&amp;A</b><span id="s-pack">pack: …</span><span id="s-chan"></span><span id="s-sig"></span><span id="s-backend"></span><span id="s-conn">connecting…</span></div>
+  <div class="disclaimer" id="disclaimer">Reference tool, not a diagnosis tool. Answers quote their sources; verify before acting. <span id="s-date"></span></div>
+</header>
+
+<div class="split" id="split">
+  <nav class="left-pane" role="navigation" aria-label="Main menu">
+    <div class="pane-title">Q&amp;A Console</div>
+    <ul class="nav-list">
+      <li><button role="tab" data-tab="ask" aria-pressed="true"><span class="nav-icon">⌘</span>Ask</button></li>
+      <li><button role="tab" data-tab="pipeline" aria-pressed="false"><span class="nav-icon">∑</span>Pipeline</button></li>
+      <li><button role="tab" data-tab="eval" aria-pressed="false"><span class="nav-icon">◐</span>Eval</button></li>
+      <li><button role="tab" data-tab="update" aria-pressed="false"><span class="nav-icon">↻</span>Update</button></li>
+      <li><button role="tab" data-tab="settings" aria-pressed="false"><span class="nav-icon">⚙</span>Settings</button></li>
+      <li><button role="tab" data-tab="about" aria-pressed="false"><span class="nav-icon">ℹ</span>About</button></li>
+    </ul>
+    <button class="collapse-toggle" id="collapse-toggle" aria-label="Collapse navigation">‹</button>
+  </nav>
+
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-valuenow="280" aria-valuemin="200" aria-valuemax="800" tabindex="0" aria-label="Resize navigation pane"></div>
+
+  <main class="right-pane" id="right-pane">
+    <section id="tab-ask" class="on">
+      <div id="ask-deck">
+        <div class="ask-zone">
+          <div class="card">
+            <h2>Ask a question</h2>
+            <textarea id="q" placeholder="e.g. What is the phototherapy threshold for a healthy newborn on day 2?" maxlength="1000"></textarea>
+            <div class="row">
+              <select id="lang" aria-label="Language" style="width:auto"><option value="en">English</option><option value="fr">Français</option><option value="pt">Português</option><option value="sw">Kiswahili</option><option value="auto">Auto</option></select>
+              <label><input type="radio" name="mode" value="answer" checked> Answer (cited)</label>
+              <label><input type="radio" name="mode" value="passages"> Passages only</label>
+              <label id="lbl-sum" title="Needs the NVIDIA NIM backend"><input type="radio" name="mode" value="grounded_summary" id="r-sum" disabled> Summary (optional)</label>
+              <button class="pri grow" id="go">Search</button>
+            </div>
+          </div>
+          <div class="card" id="examples-card">
+            <h3>Dev-set questions</h3>
+            <div id="examples" class="small"></div>
+          </div>
+        </div>
+        <div class="answer-zone">
+          <div id="result"></div>
+        </div>
+      </div>
+      <div class="card" id="histcard" style="display:none"><h2>Recent questions <span class="muted small">(kept on this device with the pack version)</span></h2><div id="hist"></div></div>
+    </section>
+
+    <section id="tab-pipeline">
+      <div class="card">
+        <h2>Build pipeline</h2>
+        <p class="muted small">PDF → chunks → second-reader number check → enrichment → embeddings + index → abstention calibration → eval gates → signed dev pack. With <code>NVIDIA_API_KEY</code> set, NVIDIA NIM models do embedding, reranking, vision cross-check and enrichment; otherwise offline stand-ins run so the mechanics can be tested.</p>
+        <div class="row">
+          <label>Backend <select id="p-mode" style="width:auto"><option value="auto">auto</option><option value="offline">offline stand-ins</option><option value="nim">NVIDIA NIM</option></select></label>
+          <label>Max PDFs <input type="text" id="p-max" style="width:70px" placeholder="all"></label>
+          <label>Enrich calls (cost cap) <input type="text" id="p-enr" style="width:70px" value="150"></label>
+          <button class="pri" id="p-run">Run pipeline</button>
+          <button class="sec" id="p-check">Check NIM models</button>
+        </div>
+        <div id="p-key" class="small"></div>
+        <div id="p-nim"></div>
+      </div>
+      <div class="card"><h2>Stages <span id="p-state" class="chip"></span></h2><div id="p-stages" class="muted">No run yet.</div><div id="p-warn"></div></div>
+      <div class="card"><h2>Log</h2><pre id="p-log">–</pre></div>
+      <div class="card"><h2>Active knowledge pack</h2><div id="p-pack" class="muted">–</div></div>
+    </section>
+
+    <section id="tab-eval">
+      <div id="e-banner"></div>
+      <div class="card"><h2>Gates</h2><div id="e-gates" class="muted">No eval report yet — run the pipeline.</div></div>
+      <div class="card"><h2>Release blockers</h2><div id="e-blockers" class="muted">–</div></div>
+    </section>
+
+    <section id="tab-update">
+      <div class="card">
+        <h2>Signed updates</h2>
+        <p class="muted small">The box only installs signed packs from its <code>incoming/</code> folder: verify signature chain and hashes → stage in the inactive slot → smoke test → atomic switch. The previous pack stays for one-tap rollback.</p>
+        <div class="row"><label class="grow">Device token <input type="text" id="u-token" placeholder="shown when the server starts"></label></div>
+        <div id="u-state"></div>
+        <div id="u-msg"></div>
+      </div>
+    </section>
+
+    <section id="tab-settings">
+      <div class="card">
+        <h2>Settings</h2>
+        <div class="row">
+          <label>Theme <select id="theme" style="width:auto"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        </div>
+        <div id="theme-status" class="muted small"></div>
+        <div class="card" style="margin-top:12px">
+          <h3>Backend</h3>
+          <div id="s-backend-status" class="muted small">–</div>
+          <div id="s-nvidia-key" class="muted small">–</div>
+          <label style="margin-top:8px;display:block"><input type="checkbox" id="safety-toggle"> Safety mode (block unverified answers)</label>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-about">
+      <div class="card">
+        <h2>About</h2>
+        <table class="plain">
+          <tr><td>Pack version</td><td id="a-version">–</td></tr>
+          <tr><td>Channel</td><td id="a-channel">–</td></tr>
+          <tr><td>Signature</td><td id="a-sig">–</td></tr>
+          <tr><td>Backend</td><td id="a-backend">–</td></tr>
+        </table>
+        <div class="banner bad small" style="margin-top:12px"><b>Reference tool, not a diagnosis tool.</b> Answers quote their sources; verify before acting. This console is for offline evaluation and does not replace professional medical advice.</div>
+        <div class="muted small" style="margin-top:12px">Built with the twb offline medical Q&amp;A pipeline. Optional NVIDIA NIM backend for generation, reranking and enrichment.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="modal"><div class="in"><div class="row"><b id="m-title" class="grow"></b><button class="sec" id="m-close">Close</button></div><div id="m-body"></div></div></div>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+function h(tag,props,...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(props||{})){if(v===false||v==null)continue;if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true? "":v);}for(const kid of kids.flat()){if(kid==null||kid===false)continue;e.append(kid.nodeType?kid:document.createTextNode(String(kid)));}return e;}
+async function api(path,opts){const r=await fetch(path,opts);let j=null;try{j=await r.json();}catch(_){}if(!r.ok){const e=new Error((j&&j.error)||r.statusText);e.status=r.status;e.body=j;throw e;}return j;}
+const post=(p,b,hd)=>api(p,{method:"POST",headers:Object.assign({"Content-Type":"application/json"},hd||{}),body:JSON.stringify(b)});
+const chip=(t,cls,title)=>h("span",{class:"chip "+(cls||""),title:title||null},t);
+const TIER={1:"Tier 1 · WHO/national guideline",2:"Tier 2 · society/peer-reviewed",3:"Tier 3 · educational/textbook",4:"Tier 4 · clinician talk, not guideline"};
+let STATE={dev:false,version:null,canGen:false,token:""};
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  document.querySelectorAll("section").forEach(s=>s.classList.toggle("on",s.id==="tab-"+b.dataset.tab));
+  if(b.dataset.tab!=="ask")refreshDev();
+}));
+
+/* ---------- status bar ---------- */
+async function refreshStatus(){
+  try{await api("/health");$("#s-conn").replaceChildren(chip("connected","ok"));}catch(e){$("#s-conn").replaceChildren(chip("box unreachable","bad"));return;}
+  try{
+    const v=await api("/version");STATE.version=v.pack_version;
+    $("#s-pack").replaceChildren("pack ",h("b",{},v.pack_version||"none"));
+    $("#s-chan").replaceChildren(v.channel==="dev"?chip("DEV PACK – not for clinical use","bad"):v.channel?chip(v.channel,"ok"):"");
+    $("#s-sig").replaceChildren(chip(v.signature&&v.signature.ok?"signature ✓":"unsigned","", v.signature&&v.signature.reason));
+    $("#s-backend").replaceChildren(v.backend?chip("backend: "+v.backend,"" ,(v.reranker||"")+" / "+(v.embedding_model||"")):"");
+    $("#s-date").textContent=v.build_date?"Pack built "+v.build_date.slice(0,10)+".":"";
+  }catch(e){}
+}
+
+/* ---------- rendering ---------- */
+function renderTable(table,hls,flags){
+  const hl=new Set((hls||[]).map(c=>c.r+","+c.c));const rows={};table.cells.forEach(c=>(rows[c.r]=rows[c.r]||[]).push(c));
+  const unit=(flags||[]).some(f=>f.kind==="unit_suspect");const t=h("table",{class:"tbl"});
+  for(let r=0;r<table.n_rows;r++){const tr=h("tr");(rows[r]||[]).sort((a,b)=>a.c-b.c).forEach(c=>{
+    const bad=unit&&!c.is_header&&/mmol\/L\s*\(\s*\d/i.test(c.text);
+    tr.append(h(c.is_header?"th":"td",{colspan:c.colspan>1?c.colspan:null,class:hl.has(c.r+","+c.c)?"hl":null,title:bad?"Source prints mmol/L next to mg/dL; probably µmol/L":null},c.text,bad?" ⚠":""));});t.append(tr);}
+  return h("div",{class:"tblwrap"},t);
+}
+function passageCard(p,opts){
+  const o=opts||{};const card=h("div",{class:"card"});
+  const head=h("div",{},chip(TIER[p.authority_tier]||("Tier "+p.authority_tier),"t"+p.authority_tier),
+    p.chunk_kind==="table"?chip("table"):null,
+    chip(p.review_status.replace("_"," "),p.review_status==="clinician_reviewed"||p.review_status==="auto_approved"?"ok":"warn","review status"),
+    p.expired?chip("past expiry – check for newer guidance","bad"):null,
+    (p.flags||[]).some(f=>f.kind==="unit_suspect")?chip("unit looks wrong in source","bad"):null,
+    (p.flags||[]).some(f=>f.kind==="parser_reader_disagree")?chip("numbers disagree between readers","bad"):null);
+  card.append(head);
+  card.append(h("div",{},h("b",{},p.doc_title||p.doc_id)," · PDF p.",p.page,p.printed_page?" (printed p."+p.printed_page+")":"",(p.section_path&&p.section_path.length)?" · "+p.section_path.join(" › "):"",
+    h("span",{class:"muted small"},"  score "+p.score)));
+  if(p.chunk_kind==="table"&&p.table){card.append(renderTable(p.table,p.highlight_cells,p.flags));if(p.table_note)card.append(h("div",{class:"banner warn small"},p.table_note));}
+  else card.append(h("div",{style:"white-space:pre-wrap;margin:6px 0"},p.text.length>900&&!o.full?p.text.slice(0,900)+"…":p.text));
+  card.append(h("div",{class:"row"},h("button",{class:"sec",onclick:()=>openPage(p)},"View source page"),
+    h("span",{class:"muted small"},p.pub_date?"published "+p.pub_date:"publication date unknown")));
+  return card;
+}
+function feedbackRow(qid){
+  const sel=h("select",{style:"width:auto"},["inaccurate","wrong_dose","missing_info","other"].map(x=>h("option",{value:x},x.replace("_"," "))));
+  const msg=h("span",{class:"muted small"});
+  const send=async(rating,cat)=>{try{await post("/feedback",{query_id:qid,rating,category:cat});msg.textContent="Thanks — queued (no question text is stored).";}catch(e){msg.textContent="Could not send: "+e.message;}};
+  return h("div",{class:"row"},h("span",{class:"muted small"},"Was this right?"),h("button",{class:"sec",onclick:()=>send(1,"accurate")},"👍"),h("button",{class:"sec",onclick:()=>send(-1,sel.value)},"👎"),sel,msg);
+}
+function renderResult(res,kind,q){
+  const box=h("div");const meta=res.retrieval||{};
+  if(res.abstained){
+    box.append(h("div",{class:"banner bad"},h("b",{},"No reliable source found."),meta.abstain_reason==="dose_not_in_sources"?" The sources do not contain a dose for this question.":" Nothing in the pack is a close enough match, so the system will not guess."));
+    const near=res.nearest_documents||[];if(near.length){box.append(h("h3",{},"Closest documents (not an answer)"));near.forEach(p=>box.append(passageCard(p)));}
+  }else{
+    if(kind==="answer"){
+      const a=h("div",{class:"card"});
+      a.append(h("div",{},chip(res.mode_used,"") ,res.verified?chip("verified ✓ every number is in a cited span","ok"):chip("not verified","bad")));
+      (res.warnings||[]).forEach(w=>a.append(h("div",{class:"banner warn small"},w)));
+      if(res.mode_used==="blocked"){a.append(h("div",{class:"banner bad"},"The generated summary failed verification and was blocked. Source passages are shown below."));}
+      else{a.append(h("div",{class:"answer"},res.answer));}
+      if(res.table_note)a.append(h("div",{class:"banner warn small"},res.table_note));
+      if(res.table&&res.passages&&res.passages[0]){const tp=res.passages.find(p=>p.chunk_id===res.table_chunk_id)||res.passages[0];a.append(renderTable(res.table,res.highlight_cells,tp.flags));}
+      if(res.citations&&res.citations.length){const d=h("details",{},h("summary",{},res.citations.length+" citation(s)"));
+        res.citations.forEach(c=>d.append(h("div",{class:"small",style:"margin:4px 0"},h("code",{},c.chunk_id.slice(0,8)),"  [",c.source_span_start,"–",c.source_span_end,"]  ",h("i",{},"“"+c.source_text+"”"))));a.append(d);}
+      a.append(feedbackRow(res.query_id));box.append(a);
+    }
+    box.append(h("h3",{},"Source passages"));(res.passages||[]).forEach(p=>box.append(passageCard(p)));
+    if(kind==="passages")box.append(feedbackRow(res.query_id));
+  }
+  const t=res.timings_ms||{};
+  box.append(h("div",{class:"muted small"},"retrieval: ",meta.mode||"–"," · reranker: ",meta.reranker||"–"," · abstain threshold ",meta.threshold!=null?meta.threshold:"–",meta.calibrated?" (calibrated)":" (NOT calibrated)"," · ",t.total!=null?t.total+" ms":"",(meta.warnings||[]).length?" · "+meta.warnings.join("; "):""));
+  return box;
+}
+async function openPage(p){
+  $("#m-title").textContent=(p.doc_title||p.doc_id)+" — page "+p.page;const body=$("#m-body");body.replaceChildren(h("span",{class:"sp"}," loading…"));$("#modal").classList.add("on");
+  try{const d=await api("/doc/"+encodeURIComponent(p.doc_id)+"?page="+p.page);
+    const wrap=h("div",{class:"pg"},h("img",{src:"data:"+d.content_type+";base64,"+d.image_base64,alt:"Original page"}));
+    const pos=(b,cls)=>h("div",{class:cls,style:`left:${b.x0*100}%;top:${b.y0*100}%;width:${(b.x1-b.x0)*100}%;height:${(b.y1-b.y0)*100}%`});
+    if(p.bbox)wrap.append(pos(p.bbox,"box"));(p.highlight_cells||[]).forEach(c=>wrap.append(pos(c.bbox,"cell")));
+    body.replaceChildren(wrap,h("div",{class:"muted small"},"Blue box: cited region. Yellow: matching table cells."));
+  }catch(e){body.replaceChildren("Page image unavailable: "+e.message);}
+}
+$("#m-close").addEventListener("click",()=>$("#modal").classList.remove("on"));$("#modal").addEventListener("click",e=>{if(e.target.id==="modal")$("#modal").classList.remove("on");});
+
+/* ---------- ask ---------- */
+function loadHist(){try{return JSON.parse(localStorage.getItem("twb_hist")||"[]");}catch(_){return[];}}
+function saveHist(q,ans,mode){try{const hs=loadHist();hs.unshift({q,a:(ans||"").slice(0,200),mode,pack:STATE.version,t:Date.now()});localStorage.setItem("twb_hist",JSON.stringify(hs.slice(0,15)));}catch(_){}renderHist();}
+function renderHist(){const hs=loadHist();$("#histcard").style.display=hs.length?"block":"none";$("#hist").replaceChildren(...hs.map(x=>h("div",{class:"small",style:"margin:6px 0"},h("a",{href:"#",onclick:e=>{e.preventDefault();$("#q").value=x.q;}},x.q),x.pack!==STATE.version?chip("answer from pack "+x.pack+" — stale","warn"):null,h("div",{class:"muted"},x.a))));}
+async function ask(){
+  const q=$("#q").value.trim();if(!q)return;const mode=document.querySelector("input[name=mode]:checked").value;const lang=$("#lang").value;
+  const out=$("#result");out.replaceChildren(h("div",{class:"card"},h("span",{class:"sp"}," searching…")));$("#go").disabled=true;
+  try{
+    if(mode==="passages"){const r=await post("/search",{query:q,language:lang,k:5,mode:"passages"});out.replaceChildren(renderResult(r,"passages",q));out.scrollIntoView({behavior:"smooth",block:"start"});saveHist(q,r.abstained?"No reliable source found.":(r.passages[0]||{}).text,"passages");}
+    else{const r=await post("/answer",{query:q,language:lang,mode:mode==="grounded_summary"?"grounded_summary":"extractive",stream:false});out.replaceChildren(renderResult(r,"answer",q));out.scrollIntoView({behavior:"smooth",block:"start"});saveHist(q,r.answer,r.mode_used);}
+  }catch(e){out.replaceChildren(h("div",{class:"banner bad"},e.status===501?"Summary needs a generation model (NVIDIA NIM backend). Extractive answers still work.":"Error: "+e.message));out.scrollIntoView({behavior:"smooth",block:"start"});}
+  finally{$("#go").disabled=false;}
+}
+$("#go").addEventListener("click",ask);$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))ask();});
+
+/* ---------- dev: pipeline / eval / update ---------- */
+const stBadge=s=>chip(s,s==="ok"||s==="done"?"ok":s==="running"?"warn":s==="skipped"||s==="failed_gates"?"warn":"bad");
+function kv(o){return Object.entries(o||{}).filter(([k,v])=>typeof v!=="object"||v===null).map(([k,v])=>k+": "+v).join(" · ");}
+let pollTimer=null;
+async function refreshDev(){
+  let d;try{d=await api("/dev/status");}catch(e){if(e.status===404){$("#p-stages").textContent="Dev endpoints are disabled. Start the server with --dev.";}return;}
+  STATE.dev=true;STATE.canGen=!!(d.backend&&d.backend.can_generate);$("#r-sum").disabled=!STATE.canGen;
+  if(d.device_token&&!$("#u-token").value)$("#u-token").value=d.device_token;
+  $("#p-key").textContent=d.nvidia_key_set?"NVIDIA_API_KEY is set in the server environment.":"NVIDIA_API_KEY is not set in the server environment: NIM mode will not work until you export it and restart.";
+  /* settings: backend status */
+  $("#s-backend-status").textContent=(d.backend&&d.backend.name?d.backend.name:"unknown")+(d.backend&&d.backend.can_generate!==undefined?" · generate: "+(d.backend.can_generate?"yes":"no"):"");
+  $("#s-nvidia-key").textContent=d.nvidia_key_set?"NVIDIA_API_KEY set in server":"NVIDIA_API_KEY not set in server";
+  /* stages */
+  const pr=d.pipeline_report;const st=$("#p-stages");$("#p-state").replaceChildren(pr?stBadge(pr.state):"");
+  if(pr){const t=h("table",{class:"plain"},h("tr",{},h("th",{},"Stage"),h("th",{},"Status"),h("th",{},"Time"),h("th",{},"Detail")));
+    pr.stages.forEach(s=>{const det=s.detail||{};const extra=s.name==="eval_gates"&&det.gates?Object.entries(det.gates).map(([k,g])=>k.replace(/_/g," ")+": "+g.status+(g.score!=null?" "+g.score:"")).join("\n"):kv(det);
+      t.append(h("tr",{},h("td",{},s.name),h("td",{},stBadge(s.status)),h("td",{},s.seconds!=null?s.seconds+" s":""),h("td",{class:"small",style:"white-space:pre-wrap"},extra)));});
+    st.replaceChildren(t);
+    $("#p-warn").replaceChildren(...(pr.warnings||[]).map(w=>h("div",{class:"banner warn small"},w)),pr.error?h("div",{class:"banner bad"},pr.error):null);
+    const st0=pr.stages.find(s=>s.name==="backend");const lc=st0&&st0.detail&&st0.detail.live_check;if(lc)$("#p-nim").replaceChildren(nimTable(lc));
+  }
+  /* pack */
+  const m=d.manifest;$("#p-pack").replaceChildren(m?h("div",{},h("div",{},chip(m.channel,m.channel==="dev"?"bad":"ok"),chip(d.version.signature.ok?"signature chain valid":"signature: "+d.version.signature.reason,d.version.signature.ok?"ok":"bad"),chip("embeddings: "+(m.embedding?m.embedding.model:"?"))),
+    h("div",{class:"small"},m.chunk_count+" chunks · "+m.table_count+" tables · "+m.page_image_count+" page images · tiers "+JSON.stringify(m.authority_tier_distribution)+" · review "+JSON.stringify(m.review_status_distribution))):"No signed pack active — apply one from the Update tab.");
+  /* eval */
+  const er=d.eval_report;const g=$("#e-gates"),b=$("#e-blockers"),bn=$("#e-banner");
+  if(er){bn.replaceChildren(er.release_eligible?h("div",{class:"banner ok"},"Release eligible."):h("div",{class:"banner bad"},h("b",{},"NOT release eligible."),er.overall_pass?" All counted gates passed, but release blockers remain.":" One or more gates failed or did not run."));
+    const t=h("table",{class:"plain"},h("tr",{},h("th",{},"Gate"),h("th",{},"Status"),h("th",{},"Score"),h("th",{},"Threshold"),h("th",{},"Result")));
+    Object.entries(er.gates).forEach(([k,x])=>{const dt=h("details",{},h("summary",{},"details"),h("pre",{},JSON.stringify(x.details,null,1)));
+      t.append(h("tr",{},h("td",{},k.replace(/_/g," ")),h("td",{},chip(x.status,x.status==="ran"||x.status==="baseline"?"":x.status==="not_run"?"bad":"warn")),h("td",{},x.score!=null?x.score:"–"),h("td",{},x.threshold!=null?x.threshold:"–"),h("td",{},x.status==="not_applicable"||x.status==="informational"?chip(x.status,"warn"):x.passed?chip("PASS","ok"):chip("FAIL","bad"),dt)));});
+    g.replaceChildren(t,h("div",{class:"muted small"},"Golden set: "+er.golden_set.versions.join(", ")+" · "+er.golden_set.n_questions+" questions · clinician reviewed: "+er.golden_set.clinician_reviewed+" · backend "+er.backend.name+" · hardware "+er.hardware.model));
+    b.replaceChildren(er.release_blockers.length?h("ul",{},er.release_blockers.map(x=>h("li",{},x))):"None.");}
+  /* update */
+  const u=d.updater;$("#u-state").replaceChildren(h("div",{},"Active: ",u.current?h("b",{},u.current.version+" (slot "+u.current.slot+", "+u.current.channel+")"):"none"," · Previous: ",u.previous?u.previous.version:"none"),
+    h("h3",{},"Incoming packs"),...(u.incoming.length?u.incoming.map(n=>h("div",{class:"row"},h("code",{},n),h("button",{class:"pri",onclick:()=>applyUpdate(n)},"Apply"))):[h("div",{class:"muted"},"None. Run the pipeline to stage one.")]),
+    h("div",{class:"row"},h("button",{class:"sec",disabled:!u.previous,onclick:rollback},"Roll back to previous")));
+  /* about: populate version info */
+  $("#a-version").textContent=d.version?d.version.pack_version:"–";
+  $("#a-channel").textContent=d.version?d.version.channel:"–";
+  const sig=d.version&&d.version.signature?d.version.signature:{ok:false,reason:"unknown"};
+  $("#a-sig").replaceChildren(chip(sig.ok?"signature chain valid":"signature: "+sig.reason,sig.ok?"ok":"bad"));
+  $("#a-backend").textContent=(d.backend&&d.backend.name?d.backend.name:"unknown")+(d.backend&&d.backend.can_generate!==undefined?" · generate: "+(d.backend.can_generate?"yes":"no"):"");
+
+  const running=d.pipeline_running;$("#p-run").disabled=running;
+  const lg=await api("/dev/pipeline/log").catch(()=>null);if(lg)$("#p-log").textContent=lg.lines.join("\n")||"–";
+  clearTimeout(pollTimer);if(running)pollTimer=setTimeout(refreshDev,2000);else refreshStatus();
+}
+function nimTable(lc){const t=h("table",{class:"plain"},h("tr",{},h("th",{},"Capability"),h("th",{},"Model"),h("th",{},"Result")));
+  Object.entries(lc.checks||{}).forEach(([k,v])=>t.append(h("tr",{},h("td",{},k),h("td",{class:"small"},v.model),h("td",{},v.ok?chip("ok · "+v.ms+" ms","ok"):chip("failed","bad"),v.error?h("div",{class:"small muted"},v.error):null))));
+  return lc.error?h("div",{class:"banner bad"},lc.error):t;}
+$("#p-check").addEventListener("click",async()=>{$("#p-nim").replaceChildren(h("span",{class:"sp"}," calling each model once…"));try{const r=await post("/dev/nim-check",{});$("#p-nim").replaceChildren(r.checks?nimTable(r):h("div",{class:"banner bad"},r.error||"failed"));}catch(e){$("#p-nim").textContent=e.message;}});
+$("#p-run").addEventListener("click",async()=>{const b={mode:$("#p-mode").value};const mx=parseInt($("#p-max").value,10);if(mx>0)b.max_pdfs=mx;const en=parseInt($("#p-enr").value,10);if(en>=0)b.enrich_limit=en;
+  try{await post("/dev/pipeline/start",b);refreshDev();}catch(e){alert(e.message);}});
+async function applyUpdate(name){const m=$("#u-msg");m.replaceChildren(h("span",{class:"sp"}," verifying and applying…"));
+  try{const r=await post("/update/apply",{pack_name:name},{"X-Device-Token":$("#u-token").value});m.replaceChildren(h("div",{class:"banner ok"},"Applied "+r.new_version+". Rollback is available."));}
+  catch(e){m.replaceChildren(h("div",{class:"banner bad"},(e.body&&e.body.message)||e.message));}
+  refreshDev();refreshStatus();}
+async function rollback(){const m=$("#u-msg");try{const r=await post("/update/rollback",{},{"X-Device-Token":$("#u-token").value});m.replaceChildren(h("div",{class:"banner ok"},"Rolled back to "+r.new_version+"."));}catch(e){m.replaceChildren(h("div",{class:"banner bad"},(e.body&&e.body.message)||e.message));}refreshDev();refreshStatus();}
+
+/* ---------- theme ---------- */
+function applyTheme(t){
+  const root=document.documentElement;
+  if(t==="system"){root.removeAttribute("data-theme");}else{root.setAttribute("data-theme",t);}
+  localStorage.setItem("twb_theme",t);
+  const saved=localStorage.getItem("twb_theme")||"system";
+  $("#theme-status").textContent=saved==="system"?"Theme: system ("+(window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light")+")":"Theme: "+saved;
+}
+function initTheme(){
+  const saved=localStorage.getItem("twb_theme")||"system";
+  $("#theme").value=saved;
+  applyTheme(saved);
+  $("#theme").addEventListener("change",e=>applyTheme(e.target.value));
+  window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",()=>{
+    if(localStorage.getItem("twb_theme")==="system")applyTheme("system");
+  });
+}
+
+/* ---------- splitter ---------- */
+const split=$("#split"), left=$(".left-pane"), splitter=$("#splitter"), right=$("right-pane");
+let width=280;
+function loadPaneState(){
+  try{const w=localStorage.getItem("twb_pane_width");if(w){width=Math.min(Math.max(parseInt(w,10),200),800);}}catch(_){}
+  try{const c=localStorage.getItem("twb_pane_collapsed");if(c==="true"){split.setAttribute("data-collapsed","true");}}catch(_){}
+}
+function applyWidth(){
+  left.style.width=width+"px";splitter.setAttribute("aria-valuenow",width);
+}
+function savePane(){try{localStorage.setItem("twb_pane_width",String(width));}catch(_){}}
+function toggleCollapse(){
+  if(window.innerWidth<=600){
+    const open=split.getAttribute("data-nav-open")==="true";
+    split.setAttribute("data-nav-open",String(!open));
+    return;
+  }
+  const coll=split.getAttribute("data-collapsed")==="true";
+  split.setAttribute("data-collapsed",String(!coll));
+  try{localStorage.setItem("twb_pane_collapsed",String(!coll));}catch(_){}
+}
+let dragging=false;
+function startDrag(e){dragging=true;splitter.classList.add("dragging");document.documentElement.style.cursor="ew-resize";e.preventDefault();}
+function moveDrag(e){
+  if(!dragging)return;
+  const rect=split.getBoundingClientRect();
+  const clientX=e.touches?e.touches[0].clientX:e.clientX;
+  let w=clientX-rect.left;
+  w=Math.min(Math.max(w,200),800);
+  if(w!==width){width=w;applyWidth();savePane();}
+}
+function endDrag(){dragging=false;splitter.classList.remove("dragging");document.documentElement.style.cursor="";}
+splitter.addEventListener("mousedown",startDrag);
+document.addEventListener("mousemove",moveDrag);
+document.addEventListener("mouseup",endDrag);
+splitter.addEventListener("touchstart",e=>{startDrag(e);},{passive:false});
+document.addEventListener("touchmove",e=>{moveDrag(e);},{passive:false});
+document.addEventListener("touchend",endDrag);
+splitter.addEventListener("keydown",e=>{
+  let step=16;
+  if(e.key==="ArrowLeft"){width=Math.max(width-step,200);e.preventDefault();}
+  else if(e.key==="ArrowRight"){width=Math.min(width+step,800);e.preventDefault();}
+  else if(e.key==="Home"){width=200;e.preventDefault();}
+  else if(e.key==="End"){width=800;e.preventDefault();}
+  else return;
+  applyWidth();savePane();
+});
+splitter.addEventListener("dblclick",()=>{width=280;applyWidth();savePane();});
+$("#collapse-toggle").addEventListener("click",toggleCollapse);
+$("#burger").addEventListener("click",()=>{const open=split.getAttribute("data-nav-open")==="true";split.setAttribute("data-nav-open",String(!open));});
+
+/* ---------- init ---------- */
+(async function init(){
+  loadPaneState();applyWidth();
+  initTheme();
+  await refreshStatus();setInterval(refreshStatus,15000);renderHist();
+  try{const ex=await api("/dev/examples");const groups={};ex.forEach(e=>(groups[e.category]=groups[e.category]||[]).push(e));
+    const names={table:"Table lookups",dosing:"Dosing",other:"Other",oos:"Out of scope (should abstain)"};
+    $("#examples").replaceChildren(h("div",{class:"muted"},"Try a dev-set question:"),...Object.entries(groups).map(([k,v])=>h("div",{},h("span",{class:"muted"},(names[k]||k)+": "),v.map(e=>h("span",{class:"chip ex",onclick:()=>{$("#q").value=e.question;}},e.question)))));}
+  catch(_){}
+  refreshDev();
+})();
+</script>
+</body>
+</html>

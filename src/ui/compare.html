@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TwB — Ingestion Comparison (NVIDIA vs Offline)</title>
+<style>
+:root {
+  --bg: #0f172a;
+  --panel: rgba(30, 41, 59, 0.6);
+  --card: rgba(51, 65, 85, 0.4);
+  --line: rgba(148, 163, 184, 0.18);
+  --text: #f8fafc;
+  --mute: #94a3b8;
+  --accent: #38bdf8;
+  --accent-dim: rgba(56, 189, 248, 0.15);
+  --ok: #4ade80;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text);
+  font-family: var(--font); overflow: hidden; }
+body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background-attachment: fixed;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+/* ---------- layout ---------- */
+#shell { display: flex; height: 100vh; overflow: hidden; }
+#left-pane {
+  width: 280px; min-width: 200px; max-width: 800px;
+  background: var(--panel); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; z-index: 10;
+  backdrop-filter: blur(20px) saturate(180%);
+  transition: width .2s ease, transform .2s ease;
+}
+#left-pane.collapsed { width: 0; min-width: 0; transform: translateX(-100%); }
+.splitter {
+  width: 8px; cursor: ew-resize; background: transparent;
+  position: relative; z-index: 20;
+}
+.splitter::before {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+  width: 1px; background: var(--line); transform: translateX(-50%); }
+.splitter:hover::before { background: var(--accent); width: 2px; }
+#right-pane { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+/* ---------- header ---------- */
+#top-bar {
+  height: 48px; background: rgba(15, 23, 42, 0.7); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+  backdrop-filter: blur(20px); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.02em; }
+.brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.status-chips { display: flex; gap: 8px; }
+.chip { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--line); background: rgba(15, 23, 42, 0.4); color: var(--mute); }
+.chip.ok { color: var(--ok); border-color: rgba(74, 222, 128, 0.3); background: rgba(74, 222, 128, 0.1); }
+.chip.bad { color: var(--bad); border-color: rgba(248, 113, 113, 0.3); background: rgba(248, 113, 113, 0.1); }
+.chip.warn { color: var(--warn); border-color: rgba(251, 191, 36, 0.3); background: rgba(251, 191, 36, 0.1); }
+/* ---------- nav ---------- */
+#nav { padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.nav-section { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--mute); margin-top: 16px; font-weight: 700; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px;
+  color: var(--text); text-decoration: none; font-size: 13px; font-weight: 500;
+  cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+.nav-item:hover { background: var(--card); border-color: var(--line); }
+.nav-item.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.nav-item .icon { width: 16px; text-align: center; }
+/* ---------- right pane content ---------- */
+#content { flex: 1; overflow-y: auto; padding: 24px; }
+.section { margin-bottom: 32px; }
+.section h2 { font-size: 18px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.01em; }
+.section p { color: var(--mute); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+/* ---------- comparison grid ---------- */
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.compare-col { display: flex; flex-direction: column; gap: 12px; }
+.compare-col h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--mute); border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 10px; }
+/* ---------- cards ---------- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px; backdrop-filter: blur(10px); }
+.card h4 { font-size: 13px; margin-bottom: 10px; color: var(--mute); text-transform: uppercase; letter-spacing: 0.05em; }
+.metric { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08); }
+.metric:last-child { border-bottom: none; }
+.metric .label { color: var(--mute); }
+.metric .value { font-variant-numeric: tabular-nums; font-weight: 600; }
+.metric .value.ok { color: var(--ok); }
+.metric .value.bad { color: var(--bad); }
+.metric .value.warn { color: var(--warn); }
+/* ---------- buttons ---------- */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; }
+.btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: #020617; border-color: var(--accent); }
+.btn.primary:hover { background: #7dd3fc; }
+.btn.danger { background: rgba(248, 113, 113, 0.15); border-color: rgba(248, 113, 113, 0.3); color: var(--bad); }
+.btn.small { padding: 6px 10px; font-size: 11px; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+/* ---------- status / progress ---------- */
+#ingest-status { font-size: 12px; color: var(--mute); margin-top: 10px; }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line);
+  border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* ---------- search results ---------- */
+.search-area { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.search-col { display: flex; flex-direction: column; gap: 10px; }
+.search-input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(15, 23, 42, 0.4); color: var(--text); font-size: 13px; }
+.search-input:focus { outline: none; border-color: var(--accent); }
+/* offline-matching result styles */
+.muted { color: var(--mute); }
+.small { font-size: 13px; }
+.banner { padding: 10px 12px; border-radius: 8px; margin: 8px 0; border: 1px solid; }
+.banner.ok { background: rgba(48, 209, 88, 0.12); border-color: rgba(48, 209, 88, 0.4); color: #0d5c33; }
+.banner.warn { background: rgba(255, 159, 10, 0.12); border-color: rgba(255, 159, 10, 0.4); color: #6b4300; }
+.banner.bad { background: rgba(255, 69, 58, 0.12); border-color: rgba(255, 69, 58, 0.4); color: #8a1c22; }
+.chip { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); margin: 0 4px 4px 0; background: var(--card); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0; }
+.tblwrap { overflow: auto; margin: 8px 0; }
+table.tbl { border-collapse: collapse; font-size: 13px; min-width: 100%; width: 100%; }
+table.tbl th, table.tbl td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+table.tbl td.hl { background: rgba(251, 191, 36, 0.25); font-weight: 700; outline: 2px solid var(--warn); outline-offset: -2px; }
+.answer { font-size: 16px; white-space: pre-wrap; border-left: 4px solid var(--accent); padding: 4px 12px; margin: 8px 0; }
+.result-item .score { float: right; font-variant-numeric: tabular-nums; }
+/* ---------- collapse toggle ---------- */
+#collapse-btn { position: absolute; left: 100%; top: 50%; transform: translate(-50%, -50%);
+  width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--mute); font-size: 10px; z-index: 15; }
+#collapse-btn:hover { border-color: var(--accent); color: var(--accent); }
+/* ---------- file list ---------- */
+.file-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--line);
+  border-radius: 8px; background: rgba(15, 23, 42, 0.2); }
+.file-item { padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 12px;
+  display: flex; justify-content: space-between; align-items: center; }
+.file-item:last-child { border-bottom: none; }
+.file-item .name { color: var(--text); }
+.file-item .size { color: var(--mute); font-size: 10px; }
+.empty { color: var(--mute); font-size: 12px; font-style: italic; padding: 16px; text-align: center; }
+/* ---------- table ---------- */
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; color: var(--mute); padding: 8px; border-bottom: 1px solid var(--line); }
+td { padding: 8px; border-bottom: 1px solid rgba(148, 163, 184, 0.08); }
+tr:hover td { background: rgba(56, 189, 248, 0.05); }
+</style>
+</head>
+<body>
+
+<div id="shell">
+  <nav id="left-pane">
+    <div id="collapse-btn" title="Collapse">&lt;</div>
+    <div id="nav">
+      <div class="nav-section">Comparison</div>
+      <a class="nav-item active" onclick="showTab('ingest')"><span class="icon">⬆</span> Ingest</a>
+      <a class="nav-item" onclick="showTab('search')"><span class="icon">🔍</span> Search</a>
+      <a class="nav-item" onclick="showTab('compare')"><span class="icon">📊</span> Compare</a>
+      <div class="nav-section">System</div>
+      <a class="nav-item" onclick="showTab('health')"><span class="icon">💊</span> Health</a>
+      <a class="nav-item" onclick="showTab('about')"><span class="icon">ℹ</span> About</a>
+    </div>
+  </nav>
+  <div class="splitter" id="splitter"></div>
+  <main id="right-pane">
+    <header id="top-bar">
+      <div class="brand"><div class="dot"></div> TwB · Compare</div>
+      <div class="status-chips" id="status-chips"></div>
+    </header>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script>
+const BASE = "http://127.0.0.1:8081";
+
+const TIER = { 1: "Tier 1 · WHO/national guideline", 2: "Tier 2 · society/peer-reviewed", 3: "Tier 3 · educational/textbook", 4: "Tier 4 · clinician talk, not guideline" };
+
+function chip(text, cls, title) {
+  const c = document.createElement("span");
+  c.className = "chip" + (cls ? " " + cls : "");
+  c.textContent = text;
+  if (title) c.title = title;
+  return c;
+}
+
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v === false || v == null) continue;
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return e;
+}
+
+function escapeHtml(t) {
+  const d = document.createElement("div");
+  d.textContent = t;
+  return d.innerHTML;
+}
+
+function headers() {
+  var stored = localStorage.getItem("cmp_auth");
+  if (stored) {
+    return { "Authorization": "Basic " + stored };
+  }
+  return {};
+}
+
+function authFetch(url, opts) {
+  var options = opts || {};
+  options.headers = Object.assign({}, options.headers, headers());
+  return fetch(url, options).then(function(resp) {
+    if (resp.status === 401) {
+      localStorage.removeItem("cmp_auth");
+      throw new Error("auth_required");
+    }
+    return resp;
+  });
+}
+
+function escapeHtml(t) {
+  const d = document.createElement("div");
+  d.textContent = t;
+  return d.innerHTML;
+}
+
+// ---------- app ----------
+async function renderApp() {
+  try {
+    await Promise.all([refreshHealth(), refreshStatus()]);
+  } catch (e) {
+    // health/status may fail if server not ready or auth required
+  }
+  showTab("ingest");
+  setInterval(function() {
+    try { refreshStatus(); } catch (e) {}
+  }, 2000);
+}
+
+async function refreshHealth() {
+  try {
+    const r = await authFetch(BASE + "/health", { headers: headers() });
+    const j = await r.json();
+    var chips = document.getElementById("status-chips");
+    var backendOk = (j.backend === "nim");
+    var statusOk = (j.status === "healthy");
+    chips.innerHTML =
+      '<span class="chip ' + (backendOk ? "ok" : "bad") + '">backend: ' + (j.backend || "none") + '</span>' +
+      '<span class="chip ' + (statusOk ? "ok" : "bad") + '">' + j.status + '</span>';
+  } catch (e) {
+    if (e.message !== "auth_required") {
+      document.getElementById("status-chips").innerHTML = '<span class="chip bad">unreachable</span>';
+    }
+  }
+}
+
+async function refreshStatus() {
+  try {
+    const r = await authFetch(BASE + "/ingest/status", { headers: headers() });
+    var j = await r.json();
+    var el = document.getElementById("ingest-status");
+    if (j.state === "running") {
+      el.innerHTML = '<span class="spinner"></span>Ingesting with NVIDIA NIM…';
+    } else if (j.state === "done") {
+      el.innerHTML = '<span style="color: var(--ok)">&#9679;</span> Last ingest complete';
+    } else if (j.state === "error") {
+      el.innerHTML = '<span style="color: var(--bad)">&#9679;</span> Ingest error: ' + j.error;
+    } else {
+      el.innerHTML = '<span style="color: var(--mute)">&#9679;</span> Idle — run ingestion to build the NVIDIA pack';
+    }
+  } catch (e) {
+    if (e.message !== "auth_required") {
+      var el = document.getElementById("ingest-status");
+      el.innerHTML = '<span style="color: var(--mute)">&#9679;</span> Idle';
+    }
+  }
+}
+
+// ---------- tabs ----------
+function showTab(name) {
+  var items = document.querySelectorAll(".nav-item");
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.remove("active");
+  }
+  if (typeof event !== "undefined" && event) {
+    event.currentTarget.classList.add("active");
+  }
+  var content = document.getElementById("content");
+  if (name === "ingest") renderIngestTab();
+  else if (name === "search") renderSearchTab();
+  else if (name === "compare") renderCompareTab();
+  else if (name === "health") renderHealthTab();
+  else if (name === "about") renderAboutTab();
+}
+
+// ---------- ingest ----------
+async function renderIngestTab() {
+  var c = document.getElementById("content");
+  c.innerHTML =
+    '<div class="section">' +
+    '<h2>Ingest — NVIDIA Cloud</h2>' +
+    '<p>Ingest all PDFs and audio files from SampleFiles/ using NVIDIA NIM cloud models ' +
+    '(embedding, rerank, vision, chat). This builds a separate pack at build-compare/, ' +
+    'completely isolated from the offline pack on port 8080.</p>' +
+    '</div>' +
+    '<div class="compare-grid">' +
+    '<div class="compare-col">' +
+    '<h3>Source files</h3>' +
+    '<div class="card" id="file-list"><div class="empty">SampleFiles/pdf/ and SampleFiles/mp3/</div></div>' +
+    '</div>' +
+    '<div class="compare-col">' +
+    '<h3>Controls</h3>' +
+    '<div class="card">' +
+    '<div class="btn-group" style="margin-bottom: 12px;">' +
+    '<button class="btn primary" id="btn-ingest" onclick="startIngest()">Start NVIDIA Ingest</button>' +
+    '<button class="btn danger" onclick="clearPack()">Clear Pack</button>' +
+    '</div>' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);margin-bottom:12px;">' +
+    '<input type="checkbox" id="incl-audio" checked> Include audio transcription' +
+    '</label>' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);margin-bottom:12px;">' +
+    '<input type="checkbox" id="max-pdfs-cb"> Max PDFs:' +
+    '<input type="number" id="max-pdfs" value="50" min="1" style="width:70px;padding:4px;border:1px solid var(--line);border-radius:4px;background:rgba(15,23,42,0.6);color:var(--text)">' +
+    '</label>' +
+    '<div id="ingest-status">Idle</div>' +
+    '</div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="section" id="ingest-results" style="display:none;">' +
+    '<h2>Ingestion Report</h2>' +
+    '<div class="card" id="ingest-report"></div>' +
+    '</div>';
+}
+
+async function startIngest() {
+  var maxPdfsCb = document.getElementById("max-pdfs-cb");
+  var maxPdfs = maxPdfsCb.checked ? parseInt(document.getElementById("max-pdfs").value) : null;
+  var includeAudio = document.getElementById("incl-audio").checked;
+  var btn = document.getElementById("btn-ingest");
+  btn.disabled = true;
+  btn.textContent = "Ingesting…";
+  try {
+    var r = await authFetch(BASE + "/ingest/compare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ max_pdfs: maxPdfs, include_audio: includeAudio })
+    });
+    var j = await r.json();
+    if (r.ok) {
+      pollIngest();
+    } else {
+      alert("Ingest failed: " + JSON.stringify(j));
+      btn.disabled = false;
+      btn.textContent = "Start NVIDIA Ingest";
+    }
+  } catch (e) {
+    if (e.message === "auth_required") {
+      alert("Authentication required — admin credentials needed for ingestion.");
+      btn.disabled = false;
+      btn.textContent = "Start NVIDIA Ingest";
+    } else {
+      alert("Ingest request failed: " + e);
+      btn.disabled = false;
+      btn.textContent = "Start NVIDIA Ingest";
+    }
+  }
+}
+
+async function pollIngest() {
+  try {
+    var r = await authFetch(BASE + "/ingest/status", { headers: headers() });
+    var j = await r.json();
+  } catch (e) {
+    if (e.message === "auth_required") {
+      document.getElementById("ingest-status").innerHTML = '<span style="color: var(--bad)">&#9679;</span> Auth required for status';
+      var btn = document.getElementById("btn-ingest");
+      btn.disabled = false;
+      btn.textContent = "Start NVIDIA Ingest";
+    }
+    return;
+  }
+  var el = document.getElementById("ingest-status");
+  var btn = document.getElementById("btn-ingest");
+  if (j.state === "running") {
+    el.innerHTML = '<span class="spinner"></span>Ingesting with NVIDIA NIM…';
+    setTimeout(pollIngest, 2000);
+  } else if (j.state === "done") {
+    el.innerHTML = '<span style="color: var(--ok)">&#9679;</span> Complete — ' +
+      j.detail.chunks + ' chunks, ' + j.detail.tables + ' tables, ' +
+      j.detail.audio_transcribed + ' audio transcripts';
+    btn.disabled = false;
+    btn.textContent = "Start NVIDIA Ingest";
+    document.getElementById("ingest-results").style.display = "block";
+    document.getElementById("ingest-report").innerHTML = renderMetrics(j.detail);
+  } else if (j.state === "error") {
+    el.innerHTML = '<span style="color: var(--bad)">&#9679;</span> Error: ' + j.error;
+    btn.disabled = false;
+    btn.textContent = "Start NVIDIA Ingest";
+  }
+}
+
+function renderMetrics(d) {
+  return (
+    '<table>' +
+    '<tr><th>Metric</th><th>Value</th></tr>' +
+    '<tr><td>PDFs ingested</td><td>' + d.pdfs + '</td></tr>' +
+    '<tr><td>Audio files transcribed</td><td>' + d.audio_transcribed + ' / ' + d.audio + '</td></tr>' +
+    '<tr><td>Total chunks</td><td class="value ok">' + d.chunks + '</td></tr>' +
+    '<tr><td>Tables detected</td><td class="value ok">' + d.tables + '</td></tr>' +
+    '<tr><td>Page images</td><td>' + d.page_images + '</td></tr>' +
+    '<tr><td>Backend</td><td>NVIDIA NIM (cloud)</td></tr>' +
+    '<tr><td>Elapsed</td><td>' + Math.round(d.seconds) + 's</td></tr>' +
+    '</table>'
+  );
+}
+
+async function clearPack() {
+  if (!confirm("Clear the NVIDIA comparison pack?")) return;
+  alert("Delete the build-compare/ directory to clear the pack, then refresh.");
+}
+
+// ---------- search ----------
+async function renderSearchTab() {
+  var devQs = [];
+  try {
+    var ex = await authFetch(BASE + "/dev/examples", { headers: headers() });
+    devQs = await ex.json();
+  } catch (e) {
+    devQs = [
+      { id: "x01", category: "general", question: "What are the steps for newborn resuscitation?" },
+      { id: "x02", category: "general", question: "What medications are used for rapid sequence intubation?" },
+      { id: "x03", category: "general", question: "What are the Sgarbossa criteria for ECG?" },
+      { id: "x04", category: "general", question: "What is late cord clamping?" },
+      { id: "x05", category: "general", question: "What is kangaroo mother care?" },
+      { id: "x06", category: "general", question: "What are pediatric transport guidelines?" }
+    ];
+  }
+  var groups = {};
+  for (var i = 0; i < devQs.length; i++) {
+    var e = devQs[i];
+    groups[e.category] = groups[e.category] || [];
+    groups[e.category].push(e);
+  }
+  var categoryNames = { table: "Table lookups", text: "Text questions", general: "General" };
+  var chipsHtml = "";
+  for (var cat in groups) {
+    var v = groups[cat];
+    var catName = categoryNames[cat] || cat;
+    chipsHtml += '<div style="margin:8px 0;"><span style="color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;">' + catName + '</span>';
+    for (var j = 0; j < v.length; j++) {
+      var qj = v[j].question;
+      var qesc = qj.replace(/'/g, "\\'");
+      chipsHtml += ' <button class="btn small" onclick="setQAndSearch(\'' + qesc + '\')" title="Click to try this question">' + escapeHtml(qj) + '</button>';
+    }
+    chipsHtml += '</div>';
+  }
+  if (!chipsHtml) {
+    chipsHtml = '<div style="color:var(--mute);font-size:12px;">No dev-set questions available.</div>';
+  }
+  var c = document.getElementById("content");
+  var stored = localStorage.getItem("cmp_auth");
+  var authBox = stored ? "" :
+    '<div class="card" style="margin-bottom:16px;">' +
+    '<h4 style="margin:0 0 8px 0;font-size:13px;">NVIDIA Compare API Login</h4>' +
+    '<label style="display:block;font-size:12px;color:var(--mute);margin-bottom:4px;">Username</label>' +
+    '<input type="text" id="api-user" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;background:rgba(15,23,42,0.6);color:var(--text);font-size:12px;" placeholder="e.g. search">' +
+    '<label style="display:block;font-size:12px;color:var(--mute);margin-bottom:4px;margin-top:8px;">Password</label>' +
+    '<input type="password" id="api-pass" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;background:rgba(15,23,42,0.6);color:var(--text);font-size:12px;" placeholder="e.g. search2026">' +
+    '<button class="btn primary btn-small" onclick="saveApiCreds()" style="margin-top:8px;">Save & Connect</button>' +
+    '<div id="api-msg" style="margin-top:6px;font-size:11px;color:var(--mute);"></div>' +
+    '</div>';
+  c.innerHTML =
+    '<div class="section">' +
+    '<h2>Search — NVIDIA Pack</h2>' +
+    '<p>Search against the NVIDIA-ingested pack — a dev subset of the SampleFiles/ collection ingested with NVIDIA NIM cloud models. Results are re-ranked with embedding similarity.</p>' +
+    authBox +
+    '<div class="search-card card">' +
+    '<textarea id="cmp-q" class="search-input" rows="3" placeholder="e.g. What are the steps for newborn resuscitation?"></textarea>' +
+    '<button class="btn primary btn-small" onclick="cmpSearch()">Search</button>' +
+    '</div>' +
+    '<div style="margin-top:10px;"><strong>Try these dev-set questions:</strong>' + chipsHtml + '</div>' +
+    '<hr style="border:none;border-top:1px solid var(--line);margin:16px 0;">' +
+    '<div class="results-list" id="cmp-results"></div>' +
+    '</div>';
+}
+
+function saveApiCreds() {
+  var user = document.getElementById("api-user").value;
+  var pass = document.getElementById("api-pass").value;
+  if (!user || !pass) {
+    document.getElementById("api-msg").textContent = "Please enter both username and password";
+    return;
+  }
+  localStorage.setItem("cmp_auth", btoa(user + ":" + pass));
+  document.getElementById("api-msg").textContent = "Saved. Refreshing...";
+  setTimeout(function() { location.reload(); }, 500);
+}
+
+function setQAndSearch(q) {
+  document.getElementById("cmp-q").value = q;
+  cmpSearch();
+}
+
+function renderTable(t) {
+  var wrap = document.createElement("div");
+  wrap.className = "tblwrap";
+  var tbl = document.createElement("table");
+  tbl.className = "tbl";
+  var thead = document.createElement("thead");
+  var tr = document.createElement("tr");
+  t.headers.forEach(function(hc) { tr.appendChild(h("th", {}, hc)); });
+  thead.appendChild(tr);
+  tbl.appendChild(thead);
+  var tbody = document.createElement("tbody");
+  t.rows.forEach(function(row) {
+    var rtr = document.createElement("tr");
+    row.forEach(function(cell, i) {
+      var cls = t.highlight_cells && t.highlight_cells.includes(i) ? "hl" : "";
+      rtr.appendChild(h("td", { class: cls }, cell));
+    });
+    tbody.appendChild(rtr);
+  });
+  tbl.appendChild(tbody);
+  wrap.appendChild(tbl);
+  return wrap;
+}
+
+function passageCard(p) {
+  var card = h("div", { class: "card" });
+  var row = h("div", { class: "row" });
+  row.appendChild(chip((p.authority_tier || 4) + "", p.authority_tier === 1 ? "ok" : p.authority_tier === 4 ? "warn" : "", TIER[p.authority_tier || 4] || ""));
+  row.appendChild(chip((p.chunk_kind || "text") + "", p.chunk_kind === "table" ? "ok" : ""));
+  row.appendChild(chip((p.review_status || "reviewed") + "", p.review_status === "reviewed" ? "ok" : "warn"));
+  if (p.expired) row.appendChild(chip("expired", "warn", "Document expired"));
+  if (p.flags && p.flags.unit_suspect) row.appendChild(chip("units?", "warn", "Suspect units"));
+  if (p.flags && p.flags.parser_reader_disagree) row.appendChild(chip("disagree", "warn", "Parser/reader disagree"));
+  card.appendChild(row);
+
+  var body = h("div", {}, h("b", {}, p.doc_title || p.doc_id || p.source || ""), " · PDF p.", p.page || p.printed_page || "", (p.section_path && p.section_path.length) ? " · " + p.section_path.join(" › ") : "", h("span", { class: "muted small", style: "float:right" }, "score " + (p.score || p.rerank_score || 0).toFixed(3)));
+  card.appendChild(body);
+
+  var textDiv = h("div", { class: "muted", style: "margin-top:6px" }, escapeHtml((p.text || "").slice(0, 900)) + (p.text && p.text.length > 900 ? "…" : ""));
+  card.appendChild(textDiv);
+
+  if (p.chunk_kind === "table" && p.table) {
+    card.appendChild(renderTable(p.table));
+  }
+
+  var footer = h("div", { class: "row muted small", style: "margin-top:6px" });
+  footer.appendChild(h("button", { class: "sec", onclick: function() { openPage(p); } }, "View source page"));
+  footer.appendChild(h("span", {}, (p.pub_date || "") + (p.pub_date && p.page ? " · p." + p.page : "")));
+  card.appendChild(footer);
+
+  var fb = feedbackRow(p.query_id || "");
+  if (fb) card.appendChild(fb);
+
+  return card;
+}
+
+function feedbackRow(qid) {
+  if (!qid) return null;
+  return h("div", { class: "row muted small", style: "margin-top:8px" },
+    h("button", { class: "sec", onclick: function() { saveHist(qid, "helpful"); } }, "👍 Helpful"),
+    h("button", { class: "sec", onclick: function() { saveHist(qid, "not_helpful"); } }, "👎 Not helpful")
+  );
+}
+
+function renderResult(res, kind, q) {
+  var box = h("div");
+
+  if (res.abstained) {
+    box.appendChild(h("div", { class: "banner bad" }, "No reliable source found."));
+    var near = res.nearest_documents || [];
+    if (near.length) {
+      box.appendChild(h("h3", {}, "Closest documents (not an answer)"));
+      near.forEach(function(p) { box.appendChild(passageCard(p)); });
+    }
+    return box;
+  }
+
+  if (kind === "answer") {
+    var meta = h("div", { class: "row muted small" });
+    meta.appendChild(chip(res.mode_used || "", ""));
+    if (res.verify !== false) meta.appendChild(chip("verified", "ok", "Grounded answer verified"));
+    else meta.appendChild(chip("not verified", "warn", "Could not verify answer"));
+    box.appendChild(meta);
+    if (res.warnings && res.warnings.length) {
+      res.warnings.forEach(function(w) { box.appendChild(h("div", { class: "banner warn" }, w)); });
+    }
+    if (res.table) {
+      box.appendChild(renderTable(res.table));
+    } else {
+      box.appendChild(h("div", { class: "answer" }, res.answer || ""));
+    }
+    if (res.citations && res.citations.length) {
+      var cites = h("details");
+      cites.appendChild(h("summary", {}, "Citations"));
+      var ul = document.createElement("ul");
+      res.citations.forEach(function(c) { ul.appendChild(h("li", {}, c)); });
+      cites.appendChild(ul);
+      box.appendChild(cites);
+    }
+    var fb = feedbackRow(res.query_id || "");
+    if (fb) box.appendChild(fb);
+  }
+
+  box.appendChild(h("h3", {}, "Source passages"));
+  (res.passages || res.results || []).forEach(function(p) { box.appendChild(passageCard(p)); });
+
+  var timing = h("div", { class: "row muted small" });
+  var ret = res.retrieval || {};
+  timing.appendChild(chip("retrieval: " + (ret.mode || ""), ""));
+  timing.appendChild(chip("reranker: " + (res.reranker || ""), ""));
+  timing.appendChild(chip("threshold: " + (ret.threshold || ""), ""));
+  if (res.calibrated !== false) timing.appendChild(chip("calibrated", "ok"));
+  var tms = res.timings_ms || {};
+  timing.appendChild(chip("total " + (tms.total_ms || tms.total || 0) + " ms", ""));
+  box.appendChild(timing);
+
+  return box;
+}
+
+function openPage(p) {
+  var d = document.createElement("div");
+  d.className = "banner";
+  d.innerHTML = "<strong>Source:</strong> " + escapeHtml(p.doc_title || p.doc_id || p.source || "") +
+    (p.page ? " · p." + p.page : "") +
+    (p.section_path && p.section_path.length ? " · " + p.section_path.join(" › ") : "") +
+    (p.pub_date ? " · " + p.pub_date : "");
+  document.getElementById("cmp-results").prepend(d);
+}
+
+async function cmpSearch() {
+  var q = document.getElementById("cmp-q").value;
+  try {
+    var r = await authFetch(BASE + "/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: q, query: q })
+    });
+  } catch (e) {
+    if (e.message === "auth_required") {
+      document.getElementById("cmp-results").innerHTML =
+        '<div class="card"><div class="banner bad">Authentication required — please log in to http://127.0.0.1:8081 with admin or search credentials first.</div></div>';
+      return;
+    }
+    throw e;
+  }
+  var j = await r.json();
+  var el = document.getElementById("cmp-results");
+  el.innerHTML = "";
+  el.appendChild(renderResult(j, "passages", q));
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function cmpAnswer() {
+  var q = document.getElementById("cmp-ans-q").value;
+  try {
+    var r = await authFetch(BASE + "/answer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: q })
+    });
+  } catch (e) {
+    if (e.message === "auth_required") {
+      document.getElementById("cmp-answer").innerHTML =
+        '<div class="result-item"><div class="src" style="color:var(--bad)">Authentication required — please log in to http://127.0.0.1:8081 with admin or search credentials first.</div></div>';
+      return;
+    }
+    throw e;
+  }
+  var j = await r.json();
+  var el = document.getElementById("cmp-answer");
+  var sourcesHtml = "";
+  for (var i = 0; i < j.sources.length; i++) {
+    sourcesHtml += '<div class="result-item"><div class="src" style="font-size:10px">Source: ' +
+      escapeHtml(j.sources[i]) + '</div></div>';
+  }
+  el.innerHTML =
+    '<div class="result-item">' +
+    '<div class="title">Answer (NVIDIA chat)</div>' +
+    '<div class="src">' + escapeHtml(j.answer) + '</div>' +
+    '</div>' +
+    sourcesHtml;
+}
+
+// ---------- compare ----------
+async function renderCompareTab() {
+  var c = document.getElementById("content");
+  c.innerHTML =
+    '<div class="section">' +
+    '<h2>Offline vs NVIDIA — Side by Side</h2>' +
+    '<p>Compare the offline pack (port 8080) with the NVIDIA pack (port 8081). ' +
+    'Both ingest the same source files; results differ by embedding/rerank model and audio transcription.</p>' +
+    '</div>' +
+    '<div class="card">' +
+    '<table>' +
+    '<tr><th>Aspect</th><th>Offline (port 8080)</th><th>NVIDIA (port 8081)</th></tr>' +
+    '<tr><td>Embedding model</td><td>offline-hash-512 (local)</td><td>nvidia/nemotron-3-embed-1b (cloud)</td></tr>' +
+    '<tr><td>Reranker</td><td>offline-lexical-idf (local)</td><td>embedding similarity (cloud fallback)</td></tr>' +
+    '<tr><td>Chat model</td><td>Not available</td><td>nvidia/nemotron-3.5-lightning-30b-a3b (cloud)</td></tr>' +
+    '<tr><td>Vision model</td><td>Not available</td><td>meta/llama-3.2-90b-vision-instruct (cloud)</td></tr>' +
+    '<tr><td>Audio transcription</td><td>Not processed</td><td>NVIDIA chat + audio (cloud)</td></tr>' +
+    '<tr><td>Pack location</td><td>build/packs/kb-*.dev</td><td>build-compare/packs/</td></tr>' +
+    '<tr><td>Cloud cost</td><td>$0</td><td>NVIDIA API credits</td></tr>' +
+    '<tr><td>Internet required</td><td>No</td><td>Yes (NVIDIA API)</td></tr>' +
+    '</table>' +
+    '</div>';
+}
+
+// ---------- health ----------
+async function renderHealthTab() {
+  var c = document.getElementById("content");
+  try {
+    var r = await fetch(BASE + "/health", { headers: headers() });
+    var j = await r.json();
+    c.innerHTML =
+      '<div class="section"><h2>Health</h2><div class="card">' +
+      '<pre>' + JSON.stringify(j, null, 2) + '</pre>' +
+      '</div></div>';
+  } catch (e) {
+    c.innerHTML =
+      '<div class="section"><h2>Health</h2><div class="card bad">Unreachable: ' + e + '</div></div>';
+  }
+}
+
+// ---------- about ----------
+async function renderAboutTab() {
+  var c = document.getElementById("content");
+  c.innerHTML =
+    '<div class="section">' +
+    '<h2>About — Comparison Console</h2>' +
+    '<p>This console is completely separate from the offline TwB console (port 8080).</p>' +
+    '<ul>' +
+    '<li><strong>Backend:</strong> NVIDIA NIM cloud models via common/nim.py</li>' +
+    '<li><strong>Server:</strong> edge/compare_server.py on port 8081</li>' +
+    '<li><strong>Pack:</strong> build-compare/packs/ (isolated from offline pack)</li>' +
+    '<li><strong>State:</strong> state-compare/ (isolated from offline state)</li>' +
+    '</ul>' +
+    '<p style="color: var(--warn); font-size: 12px;">' +
+    'Requires NVIDIA_API_KEY environment variable. Audio transcription uses the NVIDIA chat model ' +
+    'with audio input — check NVIDIA model catalog for supported ASR models and pricing.' +
+    '</p>' +
+    '</div>';
+}
+
+// ---------- splitter ----------
+var splitter = document.getElementById("splitter");
+var left = document.getElementById("left-pane");
+var dragging = false;
+splitter.addEventListener("mousedown", function() { dragging = true; });
+window.addEventListener("mousemove", function(e) {
+  if (!dragging) return;
+  var w = e.clientX;
+  w = Math.max(200, Math.min(800, w));
+  left.style.width = w + "px";
+  left.classList.remove("collapsed");
+});
+window.addEventListener("mouseup", function() { dragging = false; });
+document.getElementById("collapse-btn").addEventListener("click", function() {
+  left.classList.toggle("collapsed");
+});
+
+renderApp();
+</script>
+</body>
+</html>

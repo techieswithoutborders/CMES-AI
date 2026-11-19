@@ -1,0 +1,39 @@
+flowchart TB
+    subgraph CLOUD["☁️ CLOUD (Build-Time Only)"]
+        direction LR
+        BUILDER["Builder Machine\n(Mac/Win/Linux)"]
+        NIM["NVIDIA NIM API\n(integrate.api.nvidia.com)"]
+        PDF["Source PDFs\n(WHO, MSF, National)"]
+        
+        BUILDER -->|"1. Ingest"| PDF
+        BUILDER -->|"2. Enrich\n(NIM Chat)"| NIM
+        BUILDER -->|"3. Embed\n(NIM Embed)"| NIM
+        BUILDER -->|"4. Index & Sign"| PACK["Signed SQLite Pack\nkb-*.dev\n(kb.sqlite + manifest + blobs)"]
+    end
+
+    subgraph TRANSPORT["📦 TRANSPORT"]
+        PACK -->|"USB / WiFi / Sneakernet"| EDGE_IN
+    end
+
+    subgraph EDGE["📱 EDGE DEVICE (Runtime)"]
+        direction TB
+        EDGE_IN["Pack Ingest"]
+        UPDATER["Updater:\nverify → stage → swap\n(atomic rollback)"]
+        SERVER["Edge Server\nstdlib HTTP + SSE"]
+        ONNX["ONNX Models\nembed.onnx, rerank.onnx"]
+        UI["Test Console\n/ui/"]
+        
+        EDGE_IN --> UPDATER --> SERVER
+        SERVER --> ONNX
+        SERVER --> UI
+    end
+
+    subgraph CLIENT["👩‍⚕️ HEALTH WORKER"]
+        PHONE["Phone/Tablet\nvia WiFi AP"]
+        PHONE -->|"HTTP + SSE"| UI
+    end
+
+    style CLOUD fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style EDGE fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style CLIENT fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style TRANSPORT fill:#fce4ec,stroke:#c2185b,stroke-width:2px

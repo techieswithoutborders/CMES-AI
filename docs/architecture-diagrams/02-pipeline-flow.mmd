@@ -1,0 +1,42 @@
+flowchart LR
+    subgraph STAGE1["Stage 1: Ingest (Zero LLM)"]
+        PDF["Source PDFs\n(samplefiles/)"]
+        PLUMBER["pdfplumber\nText + Tables"]
+        GEOMETRY["Custom Geometry\nHeaders, Merged Cells, BBox"]
+        CHUNKS["Chunks + Tables\n(build/ingest/)"]
+        VERIFY["Second-Reader\nVerify"]
+    end
+
+    subgraph STAGE2["Stage 2: Enrich (Optional NIM)"]
+        CHUNKS2["Chunks"]
+        NIM_CHAT["NIM Chat Model\n(meta/llama-3.1-70b-instruct)"]
+        ENRICHED["Enriched Chunks\nAcronyms, Defs, Dosage\n(build/enrich/)"]
+        CACHE["Enrichment Cache\nCost Control"]
+    end
+
+    subgraph STAGE3["Stage 3: Index & Pack"]
+        ENRICHED2["Enriched Chunks"]
+        EMBED["NIM Embed Model\n(nvidia/llama-3.2-nv-embedqa-1b-v2)"]
+        VECTORS["HNSW Vectors"]
+        FTS5["SQLite FTS5"]
+        MANIFEST["Manifest.json\nModel IDs, Counts, Git SHA"]
+        GATES["8 Fail-Closed Gates\n(fail-closed semantics)"]
+        SIGN["Ed25519 Sign\nRoot → CI Chain"]
+        PACK_OUT["Signed Pack\nkb-1.x.x-dev/"]
+    end
+
+    PDF --> PLUMBER --> GEOMETRY --> CHUNKS --> VERIFY
+    VERIFY --> CHUNKS2
+    CHUNKS2 --> NIM_CHAT --> ENRICHED
+    NIM_CHAT -.->|"Optional\nOffline=Hash"| ENRICHED
+    ENRICHED --> CACHE
+    CACHE --> ENRICHED2
+    ENRICHED2 --> EMBED --> VECTORS
+    ENRICHED2 --> FTS5
+    VECTORS --> MANIFEST
+    FTS5 --> MANIFEST
+    MANIFEST --> GATES --> SIGN --> PACK_OUT
+
+    style STAGE1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style STAGE2 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style STAGE3 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px

@@ -1,0 +1,65 @@
+{
+  "_comment": "Authority-tier registry. Tiers are assigned by SOURCE, never inferred from content. Unknown sources default to tier 3 (conservative). A clinician must sign off this file before any release pack.",
+  "default": {
+    "tier": 3,
+    "basis": "default-conservative: unregistered source",
+    "pub_date": null
+  },
+  "sources": [
+    {
+      "match": "WHO_Guidelines_2024_01_Newborn_Care",
+      "tier": 1,
+      "basis": "WHO guideline",
+      "pub_date": "2024-01-01"
+    },
+    {
+      "match": "Guidelines_for_the_Transport_of_Critically_Ill_Patients",
+      "tier": 2,
+      "basis": "society/national guideline (issuer to be confirmed)",
+      "pub_date": "2023-06-01"
+    },
+    {
+      "match": "Sgarbossa",
+      "tier": 2,
+      "basis": "peer-reviewed criteria summary (issuer to be confirmed)",
+      "pub_date": null
+    },
+    {
+      "match": "Smart Card",
+      "tier": 2,
+      "basis": "clinical reference card (issuer to be confirmed)",
+      "pub_date": null
+    },
+    {
+      "match": "EMCases_2024_01",
+      "tier": 3,
+      "basis": "educational podcast summary, not a guideline",
+      "pub_date": "2024-01-01"
+    },
+    {
+      "match": "EMCases",
+      "tier": 3,
+      "basis": "educational podcast summary, not a guideline",
+      "pub_date": null
+    },
+    {
+      "match": "EMRAP",
+      "tier": 3,
+      "basis": "educational review, not a guideline",
+      "pub_date": "2023-06-01"
+    },
+    {
+      "match": "Case of the Month",
+      "tier": 3,
+      "basis": "educational case report",
+      "pub_date": "2026-09-01"
+    },
+    {
+      "match": "MCQ",
+      "tier": 3,
+      "basis": "board-review questions with 'why the other answers are wrong' text; not clinical guidance - excluded from the pack",
+      "pub_date": "2026-09-01",
+      "exclude": true
+    }
+  ]
+}

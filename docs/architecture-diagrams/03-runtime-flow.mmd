@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    actor HW as Health Worker
+    participant UI as /ui/ (Browser)
+    participant SERVER as Edge Server
+    participant FTS as SQLite FTS5
+    participant HNSW as HNSW Vectors
+    participant RERANK as ONNX Rerank
+    participant VERIFY as Verifier
+    participant TABLE as Table Handler
+
+    HW->>UI: Types question
+    UI->>SERVER: POST /search {query, k=10}
+    SERVER->>FTS: Lexical search (BM25)
+    SERVER->>HNSW: Vector search (ONNX embed)
+    FTS-->>SERVER: Candidate chunks
+    HNSW-->>SERVER: Candidate chunks
+    SERVER->>RERANK: Cross-encoder rerank (ONNX)
+    RERANK-->>SERVER: Top-k ranked
+    alt Table chunks found
+        SERVER->>TABLE: Resolve cells, highlights
+        TABLE-->>SERVER: Table + cell bboxes
+    end
+    SERVER->>VERIFY: Check citations, dose refusal, abstain
+    alt Abstain (no citation / unsafe dose)
+        VERIFY-->>SERVER: Abstain decision
+        SERVER-->>UI: "Not found" + reason
+    else Verified
+        VERIFY-->>SERVER: Verified + cited answer
+        SERVER-->>UI: Stream answer (SSE)
+    end
+    UI-->>HW: Cited answer + highlights + page image
