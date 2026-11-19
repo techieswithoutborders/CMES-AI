@@ -1,9 +1,9 @@
 # Build pipeline + edge test service. The edge service itself needs only the stdlib + numpy + cryptography.
-pdfplumber>=0.11
-pypdfium2>=4
-pypdf>=4
-pillow>=10
-numpy>=1.26
-cryptography>=42
-jsonschema>=4
-PyYAML>=6          # only for editing spec/openapi.yaml
+pdfplumber>=0.11.10
+pypdfium2>=5.15.2
+pypdf>=7.1.0
+pillow>=13.0.0
+numpy>=2.5.5
+cryptography>=50.0.2
+jsonschema>=4.26.0
+PyYAML>=6.0.3          # only for editing spec/openapi.yaml
