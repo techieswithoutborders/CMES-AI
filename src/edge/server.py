@@ -26,6 +26,18 @@ from indexer import signing
 ROOT = Path(__file__).resolve().parent.parent
 LANGS = {"en", "fr", "pt", "sw", "auto"}
 
+_SAFE_CTYPES = {
+    "application/json",
+    "text/html",
+    "text/css",
+    "application/javascript",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/svg+xml",
+    "application/octet-stream",
+}
+
 
 class App:
     def __init__(self, backend, state_dir="state", root_pub=None, allow_dev=False, dev=False, build_dir="build", pack_dir=None, host="127.0.0.1", auth_user=None, auth_pass=None, auth_search_user=None, auth_search_pass=None):
@@ -114,6 +126,8 @@ def make_handler(app: App):
         def _send(self, code, obj, ctype="application/json", raw=None):
             body = raw if raw is not None else json.dumps(obj, ensure_ascii=False).encode()
             self.send_response(code)
+            if ctype not in _SAFE_CTYPES:
+                ctype = "application/octet-stream"
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
@@ -160,9 +174,16 @@ def make_handler(app: App):
                 self._err(400, "bad request", "bad_request")
 
         def _static(self, rel):
+            # Reject path traversal attempts before touching the filesystem
+            if ".." in rel.split("/") or rel.startswith("/") or "\\" in rel:
+                return self._err(404, "not found", "not_found")
             base = (ROOT / "ui").resolve()
             f = (base / rel).resolve()
-            if base not in f.parents and f != base or not f.is_file():
+            try:
+                f.relative_to(base)
+            except ValueError:
+                return self._err(404, "not found", "not_found")
+            if not f.is_file():
                 return self._err(404, "not found", "not_found")
             ctype = mimetypes.guess_type(str(f))[0] or "application/octet-stream"
             self._send(200, None, ctype, raw=f.read_bytes())

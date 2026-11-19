@@ -204,7 +204,7 @@ def check_nvidia_key() -> Optional[str]:
     """Check for NVIDIA_API_KEY in environment."""
     key = os.environ.get("NVIDIA_API_KEY", "").strip()
     if key:
-        print_success(f"NVIDIA_API_KEY found: {key[:12]}...")
+        print_success("NVIDIA_API_KEY found")
         return key
     print_warning("NVIDIA_API_KEY not set in environment")
     return None
